@@ -5,7 +5,7 @@ pipeline {
         choice(
             name: 'ACTION',
             choices: ['DEPLOY', 'REMOVE'],
-            description: 'Choose whether to deploy or remove containers'
+            description: 'Choose whether to deploy or remove the application'
         )
     }
 
@@ -14,27 +14,74 @@ pipeline {
     }
 
     environment {
-        APP_NAME = "springboot-app"
+        IMAGE_NAME = "foodfiesta-springboot"
+        DOCKERHUB_REPO = "YOUR_DOCKERHUB_USERNAME/foodfiesta-springboot"
     }
 
     stages {
+
         stage('Build JAR') {
             when {
                 expression { params.ACTION == 'DEPLOY' }
             }
             steps {
-                echo "Building Spring Boot JAR..."
                 sh 'mvn clean package'
             }
         }
 
-        stage('Deploy Application') {
+        stage('Build Docker Image') {
             when {
                 expression { params.ACTION == 'DEPLOY' }
             }
             steps {
-                echo "Deploying Docker Containers..."
-                sh 'docker compose up --build -d'
+                sh "docker build -t ${IMAGE_NAME} ."
+            }
+        }
+
+        stage('Docker Login') {
+            when {
+                expression { params.ACTION == 'DEPLOY' }
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-cred-id',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+
+                    sh '''
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Tag Image') {
+            when {
+                expression { params.ACTION == 'DEPLOY' }
+            }
+            steps {
+                sh "docker tag ${IMAGE_NAME}:latest ${DOCKERHUB_REPO}:latest"
+            }
+        }
+
+        stage('Push Image') {
+            when {
+                expression { params.ACTION == 'DEPLOY' }
+            }
+            steps {
+                sh "docker push ${DOCKERHUB_REPO}:latest"
+            }
+        }
+
+        stage('Deploy Containers') {
+            when {
+                expression { params.ACTION == 'DEPLOY' }
+            }
+            steps {
+                sh 'docker compose down || true'
+                sh 'docker compose pull'
+                sh 'docker compose up -d'
             }
         }
 
@@ -43,21 +90,24 @@ pipeline {
                 expression { params.ACTION == 'REMOVE' }
             }
             steps {
-                echo "Stopping and Removing Containers..."
                 sh 'docker compose down'
                 sh 'docker image prune -af'
             }
         }
     }
+
     post {
         success {
-            echo "Pipeline executed successfully..."
+            echo "Pipeline executed successfully."
         }
+
         failure {
-            echo "Pipeline execution failed..."
+            echo "Pipeline execution failed."
         }
+
         always {
-            echo "Pipeline completed..."
+            sh 'docker logout || true'
+            echo "Pipeline completed."
         }
     }
 }
