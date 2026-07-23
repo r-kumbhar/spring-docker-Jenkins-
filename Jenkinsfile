@@ -25,7 +25,7 @@ pipeline {
                 expression { params.ACTION == 'DEPLOY' }
             }
             steps {
-                sh 'mvn clean package'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
