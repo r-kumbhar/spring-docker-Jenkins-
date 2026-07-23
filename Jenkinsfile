@@ -15,7 +15,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "foodfiesta-springboot"
-        DOCKERHUB_REPO = "YOUR_DOCKERHUB_USERNAME/foodfiesta-springboot"
+        DOCKERHUB_REPO = "ro1hit/foodfiesta-springboot"
     }
 
     stages {
